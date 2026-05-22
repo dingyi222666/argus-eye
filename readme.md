@@ -14,7 +14,7 @@ npx argus-eye \
 
 ## 命令行参数
 
-```
+```bash
 argus-eye [options]
 
   -s, --server <url>       WebSocket 地址（必填，如 ws://host:5140/argus）
@@ -32,6 +32,7 @@ argus-eye [options]
       --no-color           关闭着色输出
   -h, --help               显示帮助
   -v, --version            显示版本
+```
 
 ## 全屏检测
 
