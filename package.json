@@ -1,6 +1,6 @@
 {
     "name": "argus-eye",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "type": "module",
     "description": "Argus eye —— koishi-plugin-argus 的截图客户端 CLI。",
     "author": "dingyi222666 <dingyi222666@foxmail.com>",

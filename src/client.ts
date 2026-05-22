@@ -2,7 +2,7 @@ import WebSocket from 'ws'
 import type { ResolvedConfig } from './config'
 import { logger } from './logger'
 import { capture, listDisplays } from './capture'
-import { FullscreenDetector } from './fullscreen'
+import { FullscreenDetector, DEFAULT_ALLOW_APPS } from './fullscreen'
 import { ENC_ALGO, encryptBuffer } from './crypto'
 import type {
     ClientFrame,
@@ -39,7 +39,13 @@ export class ArgusClient {
         private readonly version: string,
         private readonly hooks: ClientHooks = {}
     ) {
-        this.fullscreen = new FullscreenDetector(config.detectFullscreen)
+        this.fullscreen = new FullscreenDetector({
+            enabled: config.detectFullscreen,
+            // 用户传的 allowApps 与默认列表合并（用户的不区分大小写补丁是为了
+            // 不会因为忘记加常见应用而误伤）
+            allowApps: [...DEFAULT_ALLOW_APPS, ...config.allowApps],
+            busyApps: config.busyApps
+        })
     }
 
     async start() {
@@ -231,28 +237,31 @@ export class ArgusClient {
         }
 
         // 先做一遍全屏检测：在玩游戏 / 全屏视频时不出图，让服务端走 busy 分支。
+        // 普通最大化的 chrome / vscode / 终端不会被拦下，因为 (a) 在 allowApps 里，
+        // (b) 即使不在白名单，几何上也是"最大化"而非"真全屏"。
         if (this.fullscreen.isEnabled()) {
             const win = await this.fullscreen.getActiveWindow()
             const display =
                 publicIndex !== undefined
                     ? this.displays[publicIndex]
                     : undefined
-            if (
-                win &&
-                display &&
-                this.fullscreen.isFullscreen(win, display)
-            ) {
-                logger.info(
-                    `peek #${frame.id} → busy: ${win.app || win.title || 'fullscreen'}`
-                )
-                this.send({
-                    type: 'peek_busy',
-                    id: frame.id,
-                    app: win.app,
-                    title: win.title,
-                    reason: 'fullscreen'
-                })
-                return
+            if (win && display) {
+                const result = this.fullscreen.check(win, display)
+                if (result.busy) {
+                    logger.info(
+                        `peek #${frame.id} → busy (${result.reason}): ${
+                            win.app || win.title || 'fullscreen'
+                        }`
+                    )
+                    this.send({
+                        type: 'peek_busy',
+                        id: frame.id,
+                        app: win.app,
+                        title: win.title,
+                        reason: result.reason ?? 'fullscreen'
+                    })
+                    return
+                }
             }
         }
 

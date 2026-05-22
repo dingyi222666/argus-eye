@@ -35,10 +35,43 @@ argus-eye [options]
 
 ## 全屏检测
 
-CLI 默认开启全屏检测：当截屏时检测到当前焦点窗口铺满整块显示器（典型如全屏游戏 / 全屏视频），
+CLI 默认开启全屏检测：当截屏时检测到当前焦点窗口是**真正的全屏**（典型如全屏游戏），
 就向服务端返回一段「客户端正忙：xxx」的提示而不是真截图。
 群友看到的是程序名（"League of Legends" / "Bilibili" 等），看不到画面。
-如果你想关掉这个行为，加 `--no-detect-fullscreen`。
+
+判定规则（按优先级从高到低）：
+
+1. `--busy-app` 显式黑名单命中 → 视为忙
+2. `--allow-app` 命中（默认包含 chrome、edge、firefox、vscode、cursor、idea、
+   终端、explorer、QQ、微信、Discord、Office 等常见应用）→ 永远不忙
+3. 几何上是真全屏：起点贴 `(0, 0)`、`bounds == contentBounds`、覆盖整块显示器
+   → 视为忙
+
+第二条让最大化的 Chrome / VSCode 这种正常工作场景照常出图；
+第三条用 `bounds == contentBounds` 区分"真全屏"和"最大化"
+（最大化窗口在 Windows 上 `bounds.x = -7` 且 `contentBounds` 比 `bounds` 小一圈）。
+
+例：
+
+```bash
+# 把 valorant / csgo / lol 直接列到黑名单
+argus-eye -s ... -t ... --busy-app valorant --busy-app csgo --busy-app "league of legends"
+
+# 把"魔兽世界"也加进白名单（如果你想被群友看到）
+argus-eye -s ... -t ... --allow-app wow
+
+# 关掉这个行为
+argus-eye -s ... -t ... --no-detect-fullscreen
+```
+
+也可以写在 `~/.argus-eye.json`：
+
+```json
+{
+    "busyApps": ["valorant", "csgo", "league of legends"],
+    "allowApps": ["mygame"]
+}
+```
 
 底层使用 [`get-windows`](https://www.npmjs.com/package/get-windows)（optional dependency）。
 该包是原生 napi 模块，部分平台（Linux Wayland）不支持，加载失败时会自动降级为永远「不忙」。

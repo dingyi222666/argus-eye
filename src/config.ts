@@ -13,6 +13,10 @@ export interface ResolvedConfig {
     backoff: number
     color: boolean
     detectFullscreen: boolean
+    /** 永不视为 busy 的应用名列表（不区分大小写、子串匹配）。空数组 = 用默认列表。 */
+    allowApps: string[]
+    /** 强制视为 busy 的应用名列表。优先级高于 allowApps。 */
+    busyApps: string[]
 }
 
 export interface CliFlags {
@@ -33,9 +37,11 @@ const HELP_TEXT = `argus-eye [options]
       --no-reconnect       禁用断线重连
       --backoff <ms>       重连最大间隔（默认 30000）
       --no-detect-fullscreen
-                           关闭"全屏即拒拍"行为（默认开启）。打开时若检测到
-                           当前焦点窗口铺满整块显示器（如全屏游戏 / 视频），
-                           则向服务端返回 peek_busy 而不是真截图。
+                           关闭"全屏即拒拍"行为（默认开启）。
+      --allow-app <name>   不视为 busy 的应用关键词（可重复）。
+                           会与默认白名单（chrome / edge / vscode / 终端 / IM 等）合并。
+      --busy-app <name>    强制视为 busy 的应用关键词（可重复），
+                           优先级高于 allow-app。例如 --busy-app valorant --busy-app csgo
       --config <path>      JSON 配置文件
       --no-color           关闭着色输出
   -h, --help               显示帮助
@@ -56,6 +62,7 @@ export function parseArgs(argv: string[]): CliFlags {
             version: ['v']
         },
         string: ['server', 'token', 'name', 'config', 'format', 'display'],
+        array: ['allowApp', 'busyApp'],
         number: ['backoff'],
         boolean: [
             'help',
@@ -118,7 +125,15 @@ export function parseArgs(argv: string[]): CliFlags {
         detectFullscreen:
             asBoolean(parsed.detectFullscreen) ??
             asBoolean(fileConfig.detectFullscreen) ??
-            true
+            true,
+        allowApps:
+            asStringArray(parsed.allowApp) ??
+            asStringArray(fileConfig.allowApps) ??
+            [],
+        busyApps:
+            asStringArray(parsed.busyApp) ??
+            asStringArray(fileConfig.busyApps) ??
+            []
     }
 
     if (parsed.listDisplays) {
@@ -133,7 +148,9 @@ export function parseArgs(argv: string[]): CliFlags {
                 reconnect: merged.reconnect ?? true,
                 backoff: merged.backoff ?? 30_000,
                 color: merged.color ?? true,
-                detectFullscreen: merged.detectFullscreen ?? true
+                detectFullscreen: merged.detectFullscreen ?? true,
+                allowApps: merged.allowApps ?? [],
+                busyApps: merged.busyApps ?? []
             }
         }
     }
@@ -158,7 +175,9 @@ export function parseArgs(argv: string[]): CliFlags {
             reconnect: merged.reconnect ?? true,
             backoff: merged.backoff ?? 30_000,
             color: merged.color ?? true,
-            detectFullscreen: merged.detectFullscreen ?? true
+            detectFullscreen: merged.detectFullscreen ?? true,
+            allowApps: merged.allowApps ?? [],
+            busyApps: merged.busyApps ?? []
         }
     }
 }
@@ -217,6 +236,23 @@ function asDisplay(v: unknown): number | string | undefined {
         const n = Number(v)
         if (!Number.isNaN(n) && /^-?\d+$/.test(v)) return n
         return v
+    }
+    return undefined
+}
+
+function asStringArray(v: unknown): string[] | undefined {
+    if (Array.isArray(v)) {
+        const out = v
+            .map((x) => (typeof x === 'string' ? x.trim() : ''))
+            .filter((x) => x.length > 0)
+        return out.length > 0 ? out : undefined
+    }
+    if (typeof v === 'string' && v.length > 0) {
+        const out = v
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+        return out.length > 0 ? out : undefined
     }
     return undefined
 }
