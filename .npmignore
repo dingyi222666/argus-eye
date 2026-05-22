@@ -1,0 +1,8 @@
+.DS_Store
+tsconfig.tsbuildinfo
+src
+yakumo.yml
+.editorconfig
+.eslintrc.yml
+.prettierrc
+.gitignore

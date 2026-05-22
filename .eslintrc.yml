@@ -1,0 +1,45 @@
+root: true
+
+parser: '@typescript-eslint/parser'
+
+env:
+    node: true
+    es2022: true
+
+extends:
+    - standard
+    - plugin:@typescript-eslint/recommended
+    - plugin:prettier/recommended
+
+plugins:
+    - '@typescript-eslint'
+
+rules:
+    prettier/prettier:
+        - error
+        - printWidth: 80
+        - tabWidth: 4
+    comma-dangle:
+        - error
+        - never
+    quotes:
+        - error
+        - single
+        - avoidEscape: true
+          allowTemplateLiterals: true
+    semi: off
+    '@typescript-eslint/semi':
+        - error
+        - never
+    no-unused-vars: off
+    '@typescript-eslint/no-unused-vars':
+        - error
+        - args: none
+    no-undef: off
+    indent: off
+    space-before-function-paren: off
+    '@typescript-eslint/space-before-function-paren':
+        - error
+        - anonymous: always
+          asyncArrow: always
+          named: never
