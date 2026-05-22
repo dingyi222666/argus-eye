@@ -9,6 +9,8 @@ export interface ResolvedConfig {
     name: string
     display?: number | string
     format: 'png' | 'jpg'
+    /** 客户端预压缩目标体积（KB）。默认 500。0 = 不预压缩。 */
+    maxKB: number
     reconnect: boolean
     backoff: number
     color: boolean
@@ -33,7 +35,10 @@ const HELP_TEXT = `argus-eye [options]
   -n, --name   <name>      上报给服务端的名字（默认: os.hostname()）
   -d, --display <id>       默认截哪块屏（数字 id，缺省=主屏）
       --list-displays      列出本机显示器后退出
-      --format <png|jpg>   传输格式（默认 jpg，省流量）
+      --format <png|jpg>   原始捕获格式（默认 jpg）。
+      --max-kb <n>         预压缩目标体积上限（KB，默认 600）。
+                           客户端会用降质量 + 缩小图片把 buffer 压到这个上限以内
+                           再加密发出，省带宽。0 = 关闭预压缩，按原始截图发。
       --no-reconnect       禁用断线重连
       --backoff <ms>       重连最大间隔（默认 30000）
       --no-detect-fullscreen
@@ -63,7 +68,7 @@ export function parseArgs(argv: string[]): CliFlags {
         },
         string: ['server', 'token', 'name', 'config', 'format', 'display'],
         array: ['allowApp', 'busyApp'],
-        number: ['backoff'],
+        number: ['backoff', 'maxKb'],
         boolean: [
             'help',
             'version',
@@ -115,6 +120,11 @@ export function parseArgs(argv: string[]): CliFlags {
             (asString(parsed.format) as 'png' | 'jpg') ??
             (asString(fileConfig.format) as 'png' | 'jpg') ??
             'jpg',
+        maxKB:
+            asNumber(parsed.maxKb) ??
+            asNumber(fileConfig.maxKB) ??
+            asNumber(fileConfig.maxKb) ??
+            600,
         reconnect:
             asBoolean(parsed.reconnect) ??
             asBoolean(fileConfig.reconnect) ??
@@ -145,6 +155,7 @@ export function parseArgs(argv: string[]): CliFlags {
                 name: merged.name ?? os.hostname(),
                 display: merged.display,
                 format: (merged.format as 'png' | 'jpg') ?? 'jpg',
+                maxKB: merged.maxKB ?? 600,
                 reconnect: merged.reconnect ?? true,
                 backoff: merged.backoff ?? 30_000,
                 color: merged.color ?? true,
@@ -172,6 +183,7 @@ export function parseArgs(argv: string[]): CliFlags {
             name: merged.name ?? os.hostname(),
             display: merged.display,
             format: merged.format,
+            maxKB: merged.maxKB ?? 600,
             reconnect: merged.reconnect ?? true,
             backoff: merged.backoff ?? 30_000,
             color: merged.color ?? true,

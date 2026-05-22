@@ -1,6 +1,6 @@
 {
     "name": "argus-eye",
-    "version": "0.2.1",
+    "version": "0.4.0",
     "type": "module",
     "description": "Argus eye —— koishi-plugin-argus 的截图客户端 CLI。",
     "author": "dingyi222666 <dingyi222666@foxmail.com>",
@@ -22,6 +22,7 @@
         "lint-fix": "yarn eslint src --ext=ts --fix"
     },
     "dependencies": {
+        "@cf-wasm/photon": "^0.3.5",
         "kleur": "^4.1.5",
         "screenshot-desktop": "^1.15.0",
         "ws": "^8.18.0",

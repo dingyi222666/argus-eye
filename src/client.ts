@@ -2,6 +2,7 @@ import WebSocket from 'ws'
 import type { ResolvedConfig } from './config'
 import { logger } from './logger'
 import { capture, listDisplays } from './capture'
+import { compressToBudget } from './compress'
 import { FullscreenDetector, DEFAULT_ALLOW_APPS } from './fullscreen'
 import { ENC_ALGO, encryptBuffer } from './crypto'
 import type {
@@ -271,21 +272,40 @@ export class ArgusClient {
                 display: target,
                 format: this.config.format
             })
-            const payload = encryptBuffer(result.buffer, this.config.token)
+
+            // 预压缩到目标体积。raw 已 <= target 时 compressToBudget 直接返回原 buffer。
+            const compressStart = Date.now()
+            let final = result.buffer
+            let mime = result.mime
+            const rawSize = result.buffer.length
+            const budgetBytes = this.config.maxKB * 1024
+            if (budgetBytes > 0 && rawSize > budgetBytes) {
+                final = compressToBudget(result.buffer, {
+                    targetBytes: budgetBytes
+                })
+                mime = 'image/jpeg'
+            }
+            const compressMs = Date.now() - compressStart
+
+            const payload = encryptBuffer(final, this.config.token)
             this.send({
                 type: 'peek_result',
                 id: frame.id,
                 image: payload,
                 enc: ENC_ALGO,
-                mime: result.mime,
+                mime,
                 display: frame.display
             })
             const elapsed = Date.now() - start
-            const kb = (result.buffer.length / 1024).toFixed(1)
+            const rawKb = (rawSize / 1024).toFixed(1)
+            const finalKb = (final.length / 1024).toFixed(1)
+            const same = final === result.buffer
             logger.info(
                 `peek #${frame.id} → display ${
                     frame.display ?? 'default'
-                } (${kb} KB ${this.config.format} encrypted, ${elapsed}ms)`
+                } (${same ? finalKb : `${rawKb}→${finalKb}`} KB ${
+                    same ? mime.replace('image/', '') : 'jpg'
+                } encrypted, total=${elapsed}ms compress=${compressMs}ms)`
             )
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
