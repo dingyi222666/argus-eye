@@ -26,10 +26,22 @@ argus-eye [options]
       --format <png|jpg>   传输格式（默认 jpg，更省流量）
       --no-reconnect       禁用断线重连
       --backoff <ms>       重连最大间隔（默认 30000）
+      --no-detect-fullscreen
+                           关闭"全屏即拒拍"行为（默认开启）
       --config <path>      JSON 配置文件
       --no-color           关闭着色输出
   -h, --help               显示帮助
   -v, --version            显示版本
+
+## 全屏检测
+
+CLI 默认开启全屏检测：当截屏时检测到当前焦点窗口铺满整块显示器（典型如全屏游戏 / 全屏视频），
+就向服务端返回一段「客户端正忙：xxx」的提示而不是真截图。
+群友看到的是程序名（"League of Legends" / "Bilibili" 等），看不到画面。
+如果你想关掉这个行为，加 `--no-detect-fullscreen`。
+
+底层使用 [`get-windows`](https://www.npmjs.com/package/get-windows)（optional dependency）。
+该包是原生 napi 模块，部分平台（Linux Wayland）不支持，加载失败时会自动降级为永远「不忙」。
 ```
 
 ## 配置文件

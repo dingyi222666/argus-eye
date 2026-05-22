@@ -12,6 +12,7 @@ export interface ResolvedConfig {
     reconnect: boolean
     backoff: number
     color: boolean
+    detectFullscreen: boolean
 }
 
 export interface CliFlags {
@@ -31,6 +32,10 @@ const HELP_TEXT = `argus-eye [options]
       --format <png|jpg>   传输格式（默认 jpg，省流量）
       --no-reconnect       禁用断线重连
       --backoff <ms>       重连最大间隔（默认 30000）
+      --no-detect-fullscreen
+                           关闭"全屏即拒拍"行为（默认开启）。打开时若检测到
+                           当前焦点窗口铺满整块显示器（如全屏游戏 / 视频），
+                           则向服务端返回 peek_busy 而不是真截图。
       --config <path>      JSON 配置文件
       --no-color           关闭着色输出
   -h, --help               显示帮助
@@ -52,7 +57,14 @@ export function parseArgs(argv: string[]): CliFlags {
         },
         string: ['server', 'token', 'name', 'config', 'format', 'display'],
         number: ['backoff'],
-        boolean: ['help', 'version', 'reconnect', 'color', 'listDisplays'],
+        boolean: [
+            'help',
+            'version',
+            'reconnect',
+            'color',
+            'listDisplays',
+            'detectFullscreen'
+        ],
         configuration: {
             'camel-case-expansion': true,
             'strip-aliased': true,
@@ -61,7 +73,8 @@ export function parseArgs(argv: string[]): CliFlags {
         default: {
             reconnect: true,
             color: true,
-            listDisplays: false
+            listDisplays: false,
+            detectFullscreen: true
         }
     })
 
@@ -101,7 +114,11 @@ export function parseArgs(argv: string[]): CliFlags {
             true,
         backoff:
             asNumber(parsed.backoff) ?? asNumber(fileConfig.backoff) ?? 30_000,
-        color: asBoolean(parsed.color) ?? true
+        color: asBoolean(parsed.color) ?? true,
+        detectFullscreen:
+            asBoolean(parsed.detectFullscreen) ??
+            asBoolean(fileConfig.detectFullscreen) ??
+            true
     }
 
     if (parsed.listDisplays) {
@@ -115,7 +132,8 @@ export function parseArgs(argv: string[]): CliFlags {
                 format: (merged.format as 'png' | 'jpg') ?? 'jpg',
                 reconnect: merged.reconnect ?? true,
                 backoff: merged.backoff ?? 30_000,
-                color: merged.color ?? true
+                color: merged.color ?? true,
+                detectFullscreen: merged.detectFullscreen ?? true
             }
         }
     }
@@ -139,7 +157,8 @@ export function parseArgs(argv: string[]): CliFlags {
             format: merged.format,
             reconnect: merged.reconnect ?? true,
             backoff: merged.backoff ?? 30_000,
-            color: merged.color ?? true
+            color: merged.color ?? true,
+            detectFullscreen: merged.detectFullscreen ?? true
         }
     }
 }

@@ -2,6 +2,7 @@ import WebSocket from 'ws'
 import type { ResolvedConfig } from './config'
 import { logger } from './logger'
 import { capture, listDisplays } from './capture'
+import { FullscreenDetector } from './fullscreen'
 import type {
     ClientFrame,
     DisplayInfo,
@@ -30,12 +31,15 @@ export class ArgusClient {
     /** 是否已成功握手（hello_ack ok）。close 时根据这个判断是不是“瞬关”。 */
     private handshaken = false
     private openedAt = 0
+    private fullscreen: FullscreenDetector
 
     constructor(
         private readonly config: ResolvedConfig,
         private readonly version: string,
         private readonly hooks: ClientHooks = {}
-    ) {}
+    ) {
+        this.fullscreen = new FullscreenDetector(config.detectFullscreen)
+    }
 
     async start() {
         try {
@@ -191,18 +195,23 @@ export class ArgusClient {
                 d.width && d.height ? `${d.width}x${d.height}` : 'unknown'
             logger.info(`  · display ${d.id}: ${d.name ?? '-'} (${size})`)
         }
+        logger.info(
+            `fullscreen detection: ${this.fullscreen.isEnabled() ? 'on' : 'off'}`
+        )
         this.startHeartbeat()
         this.hooks.onConnected?.({ displays: this.displays })
     }
 
     private async onPeek(frame: PeekRequestFrame) {
         // frame.display 是公开索引（0..N-1）。映射到本机原生 id 再传给 screenshot-desktop。
+        let publicIndex: number | undefined
         let target: number | string | undefined
         if (frame.display !== undefined) {
             const idx = typeof frame.display === 'number'
                 ? frame.display
                 : Number(frame.display)
             if (Number.isFinite(idx) && this.nativeIds[idx] !== undefined) {
+                publicIndex = idx
                 target = this.nativeIds[idx]
             } else {
                 this.send({
@@ -213,8 +222,37 @@ export class ArgusClient {
                 return
             }
         } else {
-            const idx = this.resolveDefaultIndex()
-            target = idx !== undefined ? this.nativeIds[idx] : undefined
+            publicIndex = this.resolveDefaultIndex()
+            target =
+                publicIndex !== undefined
+                    ? this.nativeIds[publicIndex]
+                    : undefined
+        }
+
+        // 先做一遍全屏检测：在玩游戏 / 全屏视频时不出图，让服务端走 busy 分支。
+        if (this.fullscreen.isEnabled()) {
+            const win = await this.fullscreen.getActiveWindow()
+            const display =
+                publicIndex !== undefined
+                    ? this.displays[publicIndex]
+                    : undefined
+            if (
+                win &&
+                display &&
+                this.fullscreen.isFullscreen(win, display)
+            ) {
+                logger.info(
+                    `peek #${frame.id} → busy: ${win.app || win.title || 'fullscreen'}`
+                )
+                this.send({
+                    type: 'peek_busy',
+                    id: frame.id,
+                    app: win.app,
+                    title: win.title,
+                    reason: 'fullscreen'
+                })
+                return
+            }
         }
 
         const start = Date.now()

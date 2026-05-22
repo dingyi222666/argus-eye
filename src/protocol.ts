@@ -45,6 +45,14 @@ export interface PeekErrorFrame {
     error: string
 }
 
+export interface PeekBusyFrame {
+    type: 'peek_busy'
+    id: string
+    app?: string
+    title?: string
+    reason?: 'fullscreen' | string
+}
+
 export interface PingFrame {
     type: 'ping'
     t?: number
@@ -70,6 +78,7 @@ export type ClientFrame =
     | HelloFrame
     | PeekResultFrame
     | PeekErrorFrame
+    | PeekBusyFrame
     | PingFrame
     | PongFrame
     | ByeFrame
