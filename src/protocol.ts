@@ -33,6 +33,7 @@ export interface PeekResultFrame {
     type: 'peek_result'
     id: string
     image: string
+    enc?: 'aes-256-gcm' | 'none'
     mime?: string
     width?: number
     height?: number

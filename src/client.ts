@@ -3,6 +3,7 @@ import type { ResolvedConfig } from './config'
 import { logger } from './logger'
 import { capture, listDisplays } from './capture'
 import { FullscreenDetector } from './fullscreen'
+import { ENC_ALGO, encryptBuffer } from './crypto'
 import type {
     ClientFrame,
     DisplayInfo,
@@ -261,11 +262,12 @@ export class ArgusClient {
                 display: target,
                 format: this.config.format
             })
-            const base64 = result.buffer.toString('base64')
+            const payload = encryptBuffer(result.buffer, this.config.token)
             this.send({
                 type: 'peek_result',
                 id: frame.id,
-                image: base64,
+                image: payload,
+                enc: ENC_ALGO,
                 mime: result.mime,
                 display: frame.display
             })
@@ -274,7 +276,7 @@ export class ArgusClient {
             logger.info(
                 `peek #${frame.id} → display ${
                     frame.display ?? 'default'
-                } (${kb} KB ${this.config.format}, ${elapsed}ms)`
+                } (${kb} KB ${this.config.format} encrypted, ${elapsed}ms)`
             )
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
