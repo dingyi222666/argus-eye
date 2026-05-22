@@ -27,6 +27,9 @@ export class ArgusClient {
     private reconnectTimer?: NodeJS.Timeout
     private heartbeatTimer?: NodeJS.Timeout
     private lastSeen = 0
+    /** 是否已成功握手（hello_ack ok）。close 时根据这个判断是不是“瞬关”。 */
+    private handshaken = false
+    private openedAt = 0
 
     constructor(
         private readonly config: ResolvedConfig,
@@ -88,9 +91,12 @@ export class ArgusClient {
         }
 
         this.socket = socket
+        this.handshaken = false
+        this.openedAt = 0
 
         socket.on('open', () => {
-            this.reconnectAttempts = 0
+            // 不在这里清零重连计数，等 hello_ack 成功再清。
+            this.openedAt = Date.now()
             this.lastSeen = Date.now()
             const defaultIndex = this.resolveDefaultIndex()
             this.send({
@@ -123,16 +129,30 @@ export class ArgusClient {
             this.socket = undefined
             this.hooks.onDisconnected?.(reason)
             if (code === 4001) {
-                logger.error(
-                    `auth failed: token rejected by server. exiting.`
-                )
+                logger.error('auth failed: token rejected by server. exiting.')
                 process.exit(2)
             }
             if (code === 4004) {
-                logger.error(`server rejected name "${this.config.name}". exiting.`)
+                logger.error(
+                    `auth failed: server rejected name "${this.config.name}". exiting.`
+                )
                 process.exit(2)
             }
-            logger.warn(`disconnected (${code} ${reason})`)
+            // 检测“连上即关” —— 多半是 WS 路径不对（koishi server 找不到匹配的
+            // ws 处理器就直接 socket.close()，对端看到的就是 1005/1006）。
+            const justOpenedAndClosed =
+                this.openedAt > 0 &&
+                !this.handshaken &&
+                Date.now() - this.openedAt < 3000
+            if (justOpenedAndClosed && (code === 1005 || code === 1006)) {
+                logger.warn(
+                    `disconnected immediately after open (${code} ${reason}). ` +
+                        `check the WebSocket path: server is configured at ` +
+                        `${this.config.server} ?`
+                )
+            } else {
+                logger.warn(`disconnected (${code} ${reason})`)
+            }
             this.scheduleReconnect()
         })
 
@@ -161,6 +181,8 @@ export class ArgusClient {
             // close 事件里会按 code 判断是否退出
             return
         }
+        this.handshaken = true
+        this.reconnectAttempts = 0
         logger.success(
             `connected as "${this.config.name}"; ${this.displays.length} display(s) reported`
         )
@@ -284,10 +306,8 @@ export class ArgusClient {
         }
         this.reconnectAttempts++
         const base = 1000
-        const delay = Math.min(
-            this.config.backoff,
-            base * Math.pow(2, this.reconnectAttempts - 1)
-        )
+        const exp = Math.min(this.reconnectAttempts - 1, 16)
+        const delay = Math.min(this.config.backoff, base * Math.pow(2, exp))
         const jitter = Math.floor(Math.random() * 500)
         const wait = delay + jitter
         logger.info(
