@@ -57,5 +57,13 @@
         "screenshot",
         "remote",
         "cli"
-    ]
+    ],
+    "homepage": "https://github.com/dingyi222666/argus-eye#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dingyi222666/argus-eye.git"
+    },
+    "bugs": {
+        "url": "https://github.com/dingyi222666/argus-eye/issues"
+    }
 }
